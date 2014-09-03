@@ -101,7 +101,7 @@ class CacheFileChangeDateServer(Server):
 		# Return true if the file does not exist
 		if not os.path.isfile(os.path.abspath(name)):
 			print("not a file: '{0}'".format(name))
-			return True
+			return None
 
 		# Get the modify time from the cache
 		cached_time = 0
