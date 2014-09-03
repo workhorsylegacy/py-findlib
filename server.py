@@ -1,4 +1,5 @@
 
+
 import os, sys
 import socket
 import pickle
@@ -61,17 +62,17 @@ class Server(object):
 	def on_client_connect(self, conn, message):
 		raise NotImplementedError('The on_client_connect method should be overridden in a child class.')
 
-class WatchFSServer(Server):
+class CacheFileChangeDateServer(Server):
 	def on_client_connect(self, conn, message):
 		# The request is for the cache file
 		if message['request'] == 'cache_file':
-			has_changed = self.has_file_changed(message['file'])
-			conn.sendall(pickle.dumps({'status':'ok', 'has_changed':has_changed}))
+			has_changed = self._has_file_changed(message['file'])
+			conn.sendall(pickle.dumps({'status':'ok', 'has_changed':has_changed, 'file':message['file']}))
 		# Unknown request
 		else:
 			conn.sendall(pickle.dumps({'status':'fail', 'message':'Unknown request: {0}'.format(message['request'])}))
 
-	def has_file_changed(self, name):
+	def _has_file_changed(self, name):
 		# Return true if the file does not exist
 		if not os.path.isfile(os.path.abspath(name)):
 			print("not a file: '{0}'".format(name))
@@ -95,7 +96,7 @@ class WatchFSServer(Server):
 
 if __name__ == '__main__':
 	logging.basicConfig(level=logging.DEBUG)
-	server = WatchFSServer('0.0.0.0', 9000)
+	server = CacheFileChangeDateServer('0.0.0.0', 9000)
 	try:
 		logging.info('Listening')
 		server.start()
