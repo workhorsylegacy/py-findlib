@@ -42,7 +42,6 @@ class Server(object):
 		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.socket.bind((self.hostname, self.port))
 		self.socket.listen(1)
-		self.cache = {}
 
 		while True:
 			conn, address = self.socket.accept()
@@ -88,11 +87,29 @@ class Server(object):
 		raise NotImplementedError('The on_client_connect method should be overridden in a child class.')
 
 class CacheFileChangeDateServer(Server):
+	def __init__(self, hostname, port):
+		super(CacheFileChangeDateServer, self).__init__(hostname, port)
+		self.cached_times = {}
+		self.cached_data = {}
+
 	def on_client_connect(self, conn, message):
-		# The request is for the cache file
+		# cache file request
 		if message['request'] == 'cache_file':
 			has_changed = self._has_file_changed(message['file'])
 			conn.sendall(pickle.dumps({'status':'ok', 'has_changed':has_changed, 'file':message['file']}))
+		# set data request
+		elif message['request'] == 'set_data':
+			key = message['key']
+			value = message['value']
+			self.cached_data[key] = value
+			conn.sendall(pickle.dumps({'status':'ok', 'key':key}))
+		# get data request
+		elif message['request'] == 'get_data':
+			key = message['key']
+			value = None
+			if key in self.cached_data:
+				value = self.cached_data[key]
+			conn.sendall(pickle.dumps({'status':'ok', 'key':key, 'value':value}))
 		# Unknown request
 		else:
 			conn.sendall(pickle.dumps({'status':'fail', 'message':'Unknown request: {0}'.format(message['request'])}))
@@ -105,8 +122,8 @@ class CacheFileChangeDateServer(Server):
 
 		# Get the modify time from the cache
 		cached_time = 0
-		if name in self.cache:
-			cached_time = self.cache[name]
+		if name in self.cached_times:
+			cached_time = self.cached_times[name]
 
 		# Get the modify time from the file system
 		fs_time = os.path.getmtime(name)
@@ -114,7 +131,7 @@ class CacheFileChangeDateServer(Server):
 		print("fs_time:{0}, cached_time:{1}".format(fs_time, cached_time))
 		# Return true if the file system has a newer date than the cache
 		if fs_time > cached_time:
-			self.cache[name] = fs_time
+			self.cached_times[name] = fs_time
 			return True
 
 		return False
@@ -134,6 +151,36 @@ class CacheFileChangeDateClient(object):
 		self._disconnect()
 
 		return result
+
+	def set_data(self, key, value):
+		self._connect()
+
+		# 
+		data = {'request':'set_data', 'key':key, 'value':value}
+		data = pickle.dumps(data)
+		self.sock.sendall(data)
+
+		# 
+		result = pickle.loads(self.sock.recv(10240))
+
+		self._disconnect()
+
+		return result
+
+	def get_data(self, key):
+		self._connect()
+
+		# 
+		message = {'request':'get_data', 'key':key}
+		message = pickle.dumps(message)
+		self.sock.sendall(message)
+
+		# 
+		result = pickle.loads(self.sock.recv(10240))
+
+		self._disconnect()
+
+		return result['value']
 
 	def _connect(self):
 		# Connect to the server
