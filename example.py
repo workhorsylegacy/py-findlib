@@ -3,9 +3,8 @@
 import findlib
 
 
-
 print('Looking for libpcre shared library ...')
-libs = findlib.get_shared_library('libpcre', 'ver.major == 8')
+libs = findlib.get_shared_library('libpcre', 'ver >= (8, 31)')
 print('    {0}'.format(libs))
 
 print('Looking for libpcre static library ...')
@@ -32,4 +31,8 @@ print(result)
 # Recursively expand an environmental variable
 result = findlib.expand_envs('$PATH')
 print(result)
+
+
+
+
 

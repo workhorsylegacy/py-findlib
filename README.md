@@ -8,7 +8,7 @@ A module for finding programs and libraries with Python
 3. Finds shared libraries, static libraries, and header files.
 4. Finds program paths.
 5. Recursively expands environmental variables.
-6. Runs commands and get output.
+6. Runs commands and gets output.
 
 
 Finding libraries
@@ -16,7 +16,7 @@ Finding libraries
     import findlib
 
     # Find a shared library
-    libs = findlib.get_shared_library('libpcre', 'ver.major == 8')
+    libs = findlib.get_shared_library('libpcre', 'ver >= (8, 31)')
     print(libs)
 
     # Find a static library

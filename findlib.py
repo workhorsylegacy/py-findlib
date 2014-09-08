@@ -78,28 +78,28 @@ def between_last(s, l, r):
 
 
 def _on_ok():
-	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+	pass
 
 def _on_warn(message=None):
-	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+	pass
 
 def _on_fail(message= None):
-	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+	pass
 
 def _on_exit(message):
-	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+	pass
 
 def _on_status(message):
-	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+	pass
 
 def _ok_symbol():
-	return ''
+	return 'ok'
 
 def _warn_symbol():
-	return ''
+	return 'warn'
 
 def _fail_symbol():
-	return ''
+	return 'fail'
 
 class ProcessRunner(object):
 	def __init__(self, command):
@@ -369,7 +369,7 @@ def to_version_cb(version_str):
 	if parse_error:
 		_on_status('Building version string')
 		_on_fail('Version string unparsable. "{0}", {1}'.format(version_str, parse_error))
-		_on_exit_('Fix version string and try again.')
+		_on_exit('Fix version string and try again.')
 
 	# Make sure each code node is not in the black list
 	for node in ast.walk(tree):
@@ -1032,40 +1032,6 @@ def static_or_shared_library_path(lib_name):
 		return path
 
 	raise Exception("Static/Shared library not found: '" + lib_name + "'")
-
-
-
-def _on_ok():
-	print(_ok_symbol())
-
-def _on_warn(message=None):
-	if message:
-		print(_warn_symbol())
-		print(message)
-
-def _on_fail(message=None):
-	print(_fail_symbol())
-	if message:
-		print(message)
-
-def _on_exit(message):
-	print('{0} Exiting ...'.format(message))
-	exit()
-
-def _on_status(message):
-	print(message)
-
-def _ok_symbol():
-	return ':)'
-
-def _warn_symbol():
-	return ":\\"
-
-def _fail_symbol():
-	return ':('
-
-
-
 
 
 
