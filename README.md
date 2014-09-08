@@ -1,2 +1,4 @@
-py-cache-file-change-dates
-==========================
+py-findlib
+==========
+
+A module for finding libraries and programs on OSes
