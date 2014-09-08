@@ -4,10 +4,11 @@ py-findlib
 A module for finding programs and libraries with Python
 
 1. Works on BeOS, BSD, Cygwin, Linux, OS X, Solaris, and  Windows.
-2. Find shared libraries, static libraries, and header files.
-3. Find program paths.
-4. Recursively expand expand environmental variables.
-5. Run commands and get output.
+2. Finds libraries with dpkg, rpm, pacman, slack packages, portage, pkg_info, mac ports, pkg-config, and the file system.
+3. Finds shared libraries, static libraries, and header files.
+4. Finds program paths.
+5. Recursively expands environmental variables.
+6. Runs commands and get output.
 
 
 Finding libraries
