@@ -27,16 +27,27 @@
 
 
 
-import os
-import re
+import sys, os, re
 import ast
+import platform
+import subprocess
 from collections import namedtuple
 
-import lib_raise_process as Process
+import findlib_server
 
-from osinfo import *
-from cache_file_change_date import *
 
+# Check if running on windows/os x
+uname = platform.system().lower().strip()
+is_windows = 'windows' in uname
+is_osx = 'darwin' in  uname
+
+
+def chomp(s):
+	for sep in ['\r\n', '\n', '\r']:
+		if s.endswith(sep):
+			return s[:-len(sep)]
+
+	return s
 
 def before(s, n):
 	i = s.find(n)
@@ -65,6 +76,177 @@ def between(s, l, r):
 def between_last(s, l, r):
 	return before_last(after(s, l), r)
 
+
+def _on_ok():
+	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+
+def _on_warn(message=None):
+	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+
+def _on_fail(message= None):
+	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+
+def _on_exit(message):
+	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+
+def _on_status(message):
+	raise NotImplemented('The function "{0}" should be overridden in module.'.format(__name__))
+
+def _ok_symbol():
+	return ''
+
+def _warn_symbol():
+	return ''
+
+def _fail_symbol():
+	return ''
+
+class ProcessRunner(object):
+	def __init__(self, command):
+		if is_windows:
+			# Remove starting ./
+			if command.startswith('./'):
+				command = command[2 :]
+			# Replace ${BLAH} with %BLAH%
+			command = command.replace('${', '%').replace('}', '%')
+
+		self._command = command
+		self._process = None
+		self._return_code = None
+		self._stdout = None
+		self._stderr = None
+		self._status = None
+
+	def run(self):
+		# Recursively expand all environmental variables
+		env = {}
+		for key, value in os.environ.items():
+			env[key] = expand_envs(value)
+
+		self._stdout = b''
+		self._stderr = b''
+
+		# Start the process and save the output
+		self._process = subprocess.Popen(
+			self._command, 
+			stderr = subprocess.PIPE, 
+			stdout = subprocess.PIPE, 
+			shell = True, 
+			env = env
+		)
+
+	def wait(self):
+		# Wait for the process to actually exit
+		self._process.wait()
+
+		# Get the return code
+		rc = self._process.returncode
+		if hasattr(os, 'WIFEXITED') and os.WIFEXITED(rc):
+			rc = os.WEXITSTATUS(rc)
+		self._return_code = rc
+
+		# Get the standard out and error in the correct format
+		try:
+			self._stderr = str(self._stderr, 'UTF-8')
+		except Exception as err:
+			pass
+		try:
+			self._stdout = str(self._stdout, 'UTF-8')
+		except Exception as err:
+			pass
+
+		# Chomp the terminating newline off the ends of output
+		self._stdout = chomp(self._stdout)
+		self._stderr = chomp(self._stderr)
+
+		# :( Failure
+		if self._return_code:
+			self._status = _fail_symbol()
+		else:
+			# :\ Warning
+			if len(self._stderr):
+				self._status = _warn_symbol()
+			# :) Success
+			else:
+				self._status = _ok_symbol()
+
+	def get_is_done(self):
+		# You have to poll a process to update the retval. Even if it has stopped already
+		if self._process.returncode == None:
+			self._process.poll()
+
+		# Read the output from the buffer
+		sout, serr = self._process.communicate()
+		self._stdout += sout
+		self._stderr += serr
+
+		# Return true if there is a return code
+		return self._process.returncode != None
+	is_done = property(get_is_done)
+
+	def get_is_success(self):
+		self._require_wait()
+		return self._status == _ok_symbol()
+	is_success = property(get_is_success)
+
+	def get_is_warning(self):
+		self._require_wait()
+		return self._status == _warn_symbol()
+	is_warning = property(get_is_warning)
+
+	def get_is_failure(self):
+		self._require_wait()
+		return self._status == _fail_symbol()
+	is_failure = property(get_is_failure)
+
+	def get_stderr(self):
+		self._require_wait()
+		return self._stderr
+	stderr = property(get_stderr)
+
+	def get_stdout(self):
+		self._require_wait()
+		return self._stdout
+	stdout = property(get_stdout)
+
+	def get_stdall(self):
+		self._require_wait()
+		return self._stdout + '\n' + self._stderr
+	stdall = property(get_stdall)
+
+	def _require_wait(self):
+		if self._return_code == None:
+			raise Exception("Wait needs to be called before any info on the process can be gotten.")
+
+def run_print(command):
+	_on_status("Running command")
+
+	runner = ProcessRunner(command)
+	runner.run()
+	runner.is_done
+	runner.wait()
+
+	if runner.is_success or runner.is_warning:
+		_on_ok()
+		sys.stdout.write(command + '\n')
+		sys.stdout.write(runner.stdall)
+	elif runner.is_failure:
+		_on_fail()
+		sys.stdout.write(command + '\n')
+		sys.stdout.write(runner.stdall)
+		_on_exit('Failed to run command.')
+
+def run_and_get_stdout(command):
+	runner = ProcessRunner(command)
+	runner.run()
+	runner.is_done
+	runner.wait()
+
+	if runner.is_failure:
+		return None
+	else:
+		return runner.stdout
+
 def program_paths(program_name):
 	paths = []
 	exts = []
@@ -85,6 +267,13 @@ def program_paths(program_name):
 			if os.access(full_name_ext, os.X_OK) and not os.path.isdir(full_name_ext):
 				paths.append(full_name_ext)
 	return paths
+
+def expand_envs(string):
+	while True:
+		before = string
+		string = os.path.expandvars(string)
+		if before == string:
+			return string
 
 def is_safe_code(source_code):
 	safe_nodes = (
@@ -178,20 +367,18 @@ def to_version_cb(version_str):
 	except SyntaxError as e:
 		parse_error = str(e)
 	if parse_error:
-		exit('blah')
-		#Print.status('Building version string')
-		#Print.fail('Version string unparsable. "{0}", {1}'.format(version_str, parse_error))
-		#Print.exit('Fix version string and try again.')
+		_on_status('Building version string')
+		_on_fail('Version string unparsable. "{0}", {1}'.format(version_str, parse_error))
+		_on_exit_('Fix version string and try again.')
 
 	# Make sure each code node is not in the black list
 	for node in ast.walk(tree):
 		# Is in black list
 		for k, v in black_list.items():
 			if isinstance(node, k):
-				exit('blah')
-				#Print.status('Building version string')
-				#Print.fail('{0} not allowed in version string. "{1}"'.format(v, version_str))
-				#Print.exit('Fix version string and try again.')
+				_on_status('Building version string')
+				_on_fail('{0} not allowed in version string. "{1}"'.format(v, version_str))
+				_on_exit('Fix version string and try again.')
 
 	code = "lambda ver: " + version_str
 	version_cb = None
@@ -201,9 +388,9 @@ def to_version_cb(version_str):
 		version_cb(version_string_to_tuple('(1, 9)'))
 	except Exception as e:
 		message = str(e).lstrip('global ')
-		#Print.status('Building version string')
-		#Print.fail('Invalid version string "{0}", {1}'.format(version_str, message))
-		#Print.exit('Fix version string and try again.')
+		_on_status('Building version string')
+		_on_fail('Invalid version string "{0}", {1}'.format(version_str, message))
+		_on_exit('Fix version string and try again.')
 
 	return version_cb
 
@@ -311,7 +498,7 @@ def _get_library_files(lib_name, version_str = None):
 	cacher = None
 	files = None
 	try:
-		cacher = CacheFileChangeDateClient()
+		cacher = findlib_server.CacheFileChangeDateClient()
 		files = cacher.get_data(search_param)
 		none_have_changed = True
 		if files:
@@ -380,7 +567,7 @@ def _get_library_files_from_pkg_config(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all packages that contain the name
-	result = Process.run_and_get_stdout("pkg-config --list-all | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("pkg-config --list-all | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
@@ -394,9 +581,9 @@ def _get_library_files_from_pkg_config(lib_name, version_cb = None):
 			continue
 
 		# Get the version, libdir, and includedir
-		version = Process.run_and_get_stdout("pkg-config --modversion {0}".format(name))
-		libdir = Process.run_and_get_stdout("pkg-config --variable=libdir {0}".format(name))
-		includedir = Process.run_and_get_stdout("pkg-config --variable=includedir {0}".format(name))
+		version = run_and_get_stdout("pkg-config --modversion {0}".format(name))
+		libdir = run_and_get_stdout("pkg-config --variable=libdir {0}".format(name))
+		includedir = run_and_get_stdout("pkg-config --variable=includedir {0}".format(name))
 		if not version or not libdir or not includedir:
 			continue
 		version = version_string_to_tuple(version)
@@ -430,7 +617,7 @@ def _get_library_files_from_ports(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all packages that contain the name
-	result = Process.run_and_get_stdout("port list | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("port list | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
@@ -458,7 +645,7 @@ def _get_library_files_from_ports(lib_name, version_cb = None):
 			continue
 
 		# Get the files and skip if there are none
-		library_files = Process.run_and_get_stdout("port contents {0}".format(name))
+		library_files = run_and_get_stdout("port contents {0}".format(name))
 		if not library_files:
 			continue
 
@@ -493,7 +680,7 @@ def _get_library_files_from_pacman(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all packages that contain the name
-	result = Process.run_and_get_stdout("pacman -Sl | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("pacman -Sl | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
@@ -526,7 +713,7 @@ def _get_library_files_from_pacman(lib_name, version_cb = None):
 			continue
 
 		# Get the library files
-		result = Process.run_and_get_stdout('pacman -Ql {0}'.format(name))
+		result = run_and_get_stdout('pacman -Ql {0}'.format(name))
 		if not result:
 			continue
 
@@ -546,7 +733,7 @@ def _get_library_files_from_dpkg(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all packages that contain the name
-	result = Process.run_and_get_stdout("dpkg --list | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("dpkg --list | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
@@ -566,7 +753,7 @@ def _get_library_files_from_dpkg(lib_name, version_cb = None):
 			continue
 
 		# Get all the files and directories
-		result = Process.run_and_get_stdout("dpkg -L {0}".format(name))
+		result = run_and_get_stdout("dpkg -L {0}".format(name))
 		if not result:
 			continue
 
@@ -587,14 +774,14 @@ def _get_library_files_from_rpm(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all packages that contain the name
-	result = Process.run_and_get_stdout("rpm -qa | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("rpm -qa | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
 	# For each package
 	for package in result.split("\n"):
 		# Get the name and version
-		result = Process.run_and_get_stdout("rpm -qi {0}".format(package))
+		result = run_and_get_stdout("rpm -qi {0}".format(package))
 		if not result:
 			continue
 		name = between(result, 'Name        : ', '\n')
@@ -610,7 +797,7 @@ def _get_library_files_from_rpm(lib_name, version_cb = None):
 			continue
 
 		# Get all the files and directories
-		result = Process.run_and_get_stdout("rpm -ql {0}".format(package))
+		result = run_and_get_stdout("rpm -ql {0}".format(package))
 		if not result:
 			continue
 
@@ -631,7 +818,7 @@ def _get_library_files_from_pkg_info(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all packages that contain the name
-	result = Process.run_and_get_stdout("pkg_info | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("pkg_info | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
@@ -651,7 +838,7 @@ def _get_library_files_from_pkg_info(lib_name, version_cb = None):
 			continue
 
 		# Get all the files and directories
-		result = Process.run_and_get_stdout("pkg_info -L {0}".format(name))
+		result = run_and_get_stdout("pkg_info -L {0}".format(name))
 		if not result:
 			continue
 
@@ -672,14 +859,14 @@ def _get_library_files_from_slackware(lib_name, version_cb = None):
 		return matching_files
 
 	# Get a list of all the installed packages
-	result = Process.run_and_get_stdout("ls /var/log/packages | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("ls /var/log/packages | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
 	# For each package
 	for package in result.split("\n"):
 		# Get the metadata for this package
-		result = Process.run_and_get_stdout("cat /var/log/packages/{0}".format(package))
+		result = run_and_get_stdout("cat /var/log/packages/{0}".format(package))
 
 		# Get the name (Everything before the version number)
 		name = []
@@ -721,7 +908,7 @@ def _get_library_files_from_portage(lib_name, version_cb = None):
 		return matching_files
 
 	# Find all the packages that contain the name
-	result = Process.run_and_get_stdout("qlist -C -I -v | grep -i {0}".format(lib_name))
+	result = run_and_get_stdout("qlist -C -I -v | grep -i {0}".format(lib_name))
 	if not result:
 		return matching_files
 
@@ -753,7 +940,7 @@ def _get_library_files_from_portage(lib_name, version_cb = None):
 			continue
 
 		# Get the files
-		result = Process.run_and_get_stdout("qlist -C {0}".format(name))
+		result = run_and_get_stdout("qlist -C {0}".format(name))
 		if not result:
 			continue
 
@@ -775,14 +962,12 @@ def get_static_library(lib_name, version_str = None):
 
 def get_shared_library(lib_name, version_str = None):
 	extension = None
-	'''
-	if Config.os_type in OSType.MacOS:
+	if is_osx:
 		extension = '.dylib'
-	elif Config.os_type in OSType.Windows:
+	elif is_windows:
 		extension = '.dll'
 	else:
-	'''
-	extension = '.so'
+		extension = '.so'
 
 	library_files = _get_library_files(lib_name, version_str)
 	shared_file = _get_matched_file_from_library_files(lib_name, extension, library_files)
@@ -847,5 +1032,41 @@ def static_or_shared_library_path(lib_name):
 		return path
 
 	raise Exception("Static/Shared library not found: '" + lib_name + "'")
+
+
+
+def _on_ok():
+	print(_ok_symbol())
+
+def _on_warn(message=None):
+	if message:
+		print(_warn_symbol())
+		print(message)
+
+def _on_fail(message=None):
+	print(_fail_symbol())
+	if message:
+		print(message)
+
+def _on_exit(message):
+	print('{0} Exiting ...'.format(message))
+	exit()
+
+def _on_status(message):
+	print(message)
+
+def _ok_symbol():
+	return ':)'
+
+def _warn_symbol():
+	return ":\\"
+
+def _fail_symbol():
+	return ':('
+
+
+
+
+
 
 
