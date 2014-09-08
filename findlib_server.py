@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
-# Copyright (c) 2014, Matthew Brennan Jones <matthew.brennan.jones@gmail.com>
-# Py-cache-file-change-dates is a server that monitors if files have changed.
+# Copyright (c) 2013-2014, Matthew Brennan Jones <matthew.brennan.jones@gmail.com>
+# Py-findlib is for finding libraries and programs on most operating systems
 # It uses a MIT style license
-# It is hosted at: https://github.com/workhorsy/py-cache-file-change-dates
+# It is hosted at: https://github.com/workhorsy/py-findlib
 # 
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the

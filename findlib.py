@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 
-# Copyright (c) 2014, Matthew Brennan Jones <matthew.brennan.jones@gmail.com>
+# Copyright (c) 2013-2014, Matthew Brennan Jones <matthew.brennan.jones@gmail.com>
 # Py-findlib is for finding libraries and programs on most operating systems
 # It uses a MIT style license
 # It is hosted at: https://github.com/workhorsy/py-findlib
