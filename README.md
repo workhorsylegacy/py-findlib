@@ -1,7 +1,7 @@
 py-findlib
 ==========
 
-A module for finding programs and libraries with Python
+A module for finding programs and libraries with Python 2 & 3
 
 1. Works on BeOS, BSD, Cygwin, Linux, OS X, Solaris, and  Windows.
 2. Finds libraries with dpkg, rpm, pacman, slack packages, portage, pkg_info, mac ports, pkg-config, and the file system.
