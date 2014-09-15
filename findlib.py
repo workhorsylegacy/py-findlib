@@ -35,6 +35,7 @@ from collections import namedtuple
 
 import findlib_server
 
+PY2 = sys.version_info[0] == 2
 
 # Check if running on windows/os x
 uname = platform.system().lower().strip()
@@ -123,8 +124,8 @@ class ProcessRunner(object):
 		for key, value in os.environ.items():
 			env[key] = expand_envs(value)
 
-		self._stdout = b''
-		self._stderr = b''
+		self._stdout = []
+		self._stderr = []
 
 		# Start the process and save the output
 		self._process = subprocess.Popen(
@@ -145,15 +146,17 @@ class ProcessRunner(object):
 			rc = os.WEXITSTATUS(rc)
 		self._return_code = rc
 
-		# Get the standard out and error in the correct format
-		try:
+		# Get strerr and stdout into byte strings
+		self._stderr = b''.join(self._stderr)
+		self._stdout = b''.join(self._stdout)
+
+		# Convert strerr and stdout into unicode
+		if PY2:
+			self._stderr = unicode(self._stderr, 'UTF-8')
+			self._stdout = unicode(self._stdout, 'UTF-8')
+		else:
 			self._stderr = str(self._stderr, 'UTF-8')
-		except Exception as err:
-			pass
-		try:
 			self._stdout = str(self._stdout, 'UTF-8')
-		except Exception as err:
-			pass
 
 		# Chomp the terminating newline off the ends of output
 		self._stdout = chomp(self._stdout)
@@ -177,8 +180,8 @@ class ProcessRunner(object):
 
 		# Read the output from the buffer
 		sout, serr = self._process.communicate()
-		self._stdout += sout
-		self._stderr += serr
+		self._stdout.append(sout)
+		self._stderr.append(serr)
 
 		# Return true if there is a return code
 		return self._process.returncode != None
