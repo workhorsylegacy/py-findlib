@@ -250,25 +250,32 @@ def run_and_get_stdout(command):
 	else:
 		return runner.stdout
 
-def program_paths(program_name):
+def program_paths(*program_names):
+	import glob
 	paths = []
 	exts = []
 	if 'PATHEXT' in os.environ:
 		exts = os.environ['PATHEXT'].split(os.pathsep)
-
 	path = os.environ['PATH']
+
+	# Each path
 	for p in os.environ['PATH'].split(os.pathsep):
-		full_name = os.path.join(p, program_name)
+		# Each program name
+		for program_name in program_names:
+			full_name = os.path.join(p, program_name)
+			full_names = glob.glob(full_name)
 
-		# Save the path if it is executable
-		if os.access(full_name, os.X_OK) and not os.path.isdir(full_name):
-			paths.append(full_name)
-		# Save the path if we found one with a common extension like .exe
-		for e in exts:
-			full_name_ext = full_name + e
+			# Each program name that exists in a path
+			for name in full_names:
+				# Save the path if it is executable
+				if name and os.access(name, os.X_OK) and not os.path.isdir(name):
+					paths.append(name)
+				# Save the path if we found one with a common extension like .exe
+				for e in exts:
+					full_name_ext = name + e
 
-			if os.access(full_name_ext, os.X_OK) and not os.path.isdir(full_name_ext):
-				paths.append(full_name_ext)
+					if os.access(full_name_ext, os.X_OK) and not os.path.isdir(full_name_ext):
+						paths.append(full_name_ext)
 	return paths
 
 def expand_envs(string):

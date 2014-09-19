@@ -23,10 +23,13 @@ findlib.run_print('uptime')
 result = findlib.run_and_get_stdout('uptime')
 print(result)
 
-# Find the full path of gcc
+# Find the full paths of gcc
 result = findlib.program_paths('gcc')
 print(result)
 
+# Find the full paths of gccXX and gcc-X.X
+result = findlib.program_paths(r'gcc[0-9]*', r'gcc-[0-9|\.]*')
+print(result)
 
 # Recursively expand an environmental variable
 result = findlib.expand_envs('$PATH')
