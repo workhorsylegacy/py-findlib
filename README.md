@@ -1,6 +1,42 @@
 py-findlib
 ==========
 
+ &nbsp;
+ 
+ &nbsp;
+
+
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+
+!!! WARNING !!!
+=========
+
+As of September 2017, this project is deprecated.
+
+
+ 
+ :warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+ :warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+ :warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: :warning: :warning: :warning: :warning:
+ 
+ &nbsp;
+ 
+ &nbsp;
+ 
+ &nbsp;
+ 
+ &nbsp;
+
 A module for finding programs and libraries with Python 2 & 3
 
 1. Works on BeOS, BSD, Cygwin, Linux, OS X, Solaris, and  Windows.
